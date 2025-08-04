@@ -1,0 +1,398 @@
+---
+title: "B Case Study"
+author: "Johnny Lin"
+date: "`r Sys.Date()`"
+format: html
+editor: visual
+---
+
+**Capstone \| Bellabeat Case Study \| R**
+
+## 1. Context
+
+Founded in 2013, Bellabeat has quickly established itself as a high-tech manufacturer of health-focused products for women. It's product line, from necklaces to water bottles, provides users with data related to their activity, sleep, stress, reproductive health, and even mindfulness habits. With a emphasis on data-driven wellness, its mission is to empower women with knowledge about their daily habits and help guide healthy decisions.
+
+#### Scenario
+
+Bellabeat has the potential to become a larger player in the global smart device market. In efforts to expand, the company has invested in traditional advertising channels—such as radio, billboards, print, and television—as well as digital platforms like Google, Facebook, and Instagram. However, co-founder Urška Sršen believes that a deeper analysis of customer behavior could reveal more opportunities for growth.
+
+## 2. Ask
+
+#### 2.1 The Business Task
+
+Analyze Fitbit fitness tracker data to uncover user behavior patterns and apply those insights to help guide Bellabeat’s marketing strategy.
+
+#### 2.2 Key Stakeholders
+
+-   Urška Sršen: Co-founder and Chief Creative Officer of Bellabeat
+-   Sando Mur: Mathematician and Co-founder; key member of Bellabeat's executive team
+-   Bellabeat Marketing Analytics Team
+
+## 3. Prepare
+
+#### 3.1 Data set used:
+
+The data set used in this project comes from the [FitBit Fitness Tracker Data](https://www.kaggle.com/datasets/arashnic/fitbit/data) (CC0: Public Domain), made available by Mobius on Kaggle. It contains data collected from 30 consenting Fit-bit users over the span of two months.
+
+#### 3.2 Limitations:
+
+The data set includes a small sample size with no demographic details, which raises the potential for sampling bias. It is not possible to confirm whether the sample is representative of the broader population. Additionally, the data dates back to 2016, making it nearly a decade old as of today. Therefore, this case study will take an operational approach — focusing on uncovering behavioral patterns rather than drawing generalized conclusions.
+
+#### 3.3 Approach:
+
+I will be conducting the analysis in an R environment via RStudio, a single platform to explore, clean, process, and visualize the data sets.
+
+3.4 Loading packages and libraries
+
+```{r}
+library(tidyverse)
+
+library(lubridate) # for working with dates and times
+library(dplyr) # for data manipulation 
+library(ggplot2) # for data visualization
+library(tidyr) # for reshaping data
+library(janitor) # for cleaning column names and summarizing 
+
+library(openair)
+```
+
+## 4. Process Phase
+
+#### 4.1 Importing data sets
+
+To maintain clarity, I've chosen to exclude the METs (Metabolic Equivalent of Task) data set, which refers to how much energy someone uses at a given moment compared to resting. The lack of clear documentation and the complexity of minute-by-minute MET makes it less practical for this analysis.
+
+We will now load the data into R using the `read_csv()` function from the **readr** package through **tidyverse**.
+
+```{r}
+# Includes daily user activity metrics: steps, distance, calories, and active minutes
+daily_activity <- read_csv("Fitabase Data 4.12.16-5.12.16/dailyActivity_merged.csv")
+
+# Contains total daily sleep duration and time spent in bed
+sleep_day <- read_csv("Fitabase Data 4.12.16-5.12.16/sleepDay_merged.csv")
+
+# Second-level (per-second) heart rate data for a subset of users
+heartrate <- read_csv("Fitabase Data 4.12.16-5.12.16/heartrate_seconds_merged.csv")
+
+# Tracks hourly step counts across users
+hourly_steps <- read_csv("Fitabase Data 4.12.16-5.12.16/hourlySteps_merged.csv")
+```
+
+#### 4.2 Previewing the Data
+
+To understand the contents of our data set, we can use `head()` to preview the first few rows and then inspect the underlying data types using `str()`
+
+```{r}
+head(daily_activity)
+str(daily_activity)
+
+head(sleep_day)
+str(sleep_day)
+
+head(heartrate)
+str(heartrate)
+
+head(hourly_steps)
+str(hourly_steps)
+
+```
+
+#### 4.3 Cleaning the Data
+
+Now that we've explored our data, the next step is to make sure each data set is in good shape for analysis.
+
+4.3.1 Checking for any missing values
+
+We first make sure there are no gaps that would skew our analysis.
+
+```{r}
+colSums(is.na(daily_activity))
+colSums(is.na(sleep_day))
+colSums(is.na(heartrate))
+colSums(is.na(hourly_steps))
+```
+
+#### 4.3.2 Checking for any duplicated rows
+
+```{r}
+sum(duplicated(daily_activity))
+sum(duplicated(sleep_day))
+sum(duplicated(heartrate))
+sum(duplicated(hourly_steps))
+```
+
+#### 4.3.3 Removing found duplicated rows
+
+Three duplicate records were identified in the `sleep_day` data set. We will now remove them.
+
+```{r}
+sleep_day <- sleep_day %>%
+  distinct()
+```
+
+#### 4.3.4 Standardizing Column Names
+
+It is good practice to make sure all column names are consistent first in order to improve readability and avoid merge failures later on. We'll use the `clean_names()` function from the `janitor` package which will convert all names to lowercase and replace spaces/punctuation with underscores.
+
+```{r}
+
+daily_activity <- clean_names(daily_activity)
+sleep_day <- clean_names(sleep_day)
+hourly_steps <- clean_names(hourly_steps)
+heartrate <- clean_names(heartrate)
+```
+
+#### 4.3.5 Converting Date/Time Columns
+
+Using the `lubridate` package, we will also convert all the relevant dates and time columns into the proper date or datetime format
+
+```{r}
+
+daily_activity <- daily_activity %>%
+  rename(date = activity_date) %>%
+  mutate(date = mdy(date))
+
+sleep_day <- sleep_day %>%
+  rename(date = sleep_day) %>%
+  mutate(date = as_date(mdy_hms(date)))
+
+heartrate <- heartrate %>%
+  mutate(datetime = mdy_hms(time))
+
+hourly_steps <- hourly_steps %>%
+  mutate(datetime = mdy_hms(activity_hour))
+```
+
+#### 4.4 Merging Data sets
+
+Now that we've done the cleaning, we can start merging to explore possible relationships between any metrics.
+
+```{r}
+# Merge daily activity + sleep
+activity_sleep <- left_join(daily_activity, sleep_day, by = c("id", "date"))
+
+```
+
+## 5 Analyze & Share
+
+Considering the fact that Bellabeat's products are all mostly focused around physical activity and restful recovery, it makes sense to test whether these two behaviors influence each other in any way.
+
+#### 5.1 The Relationship Between Steps and Sleep
+
+Using a scatter plot, we can examine the relationship between daily steps and sleep duration. I will also include a regression line to better highlight any underlying trends.
+
+```{r}
+activity_sleep %>%
+  filter(!is.na(total_minutes_asleep)) %>%
+  ggplot(aes(x = total_steps, y = total_minutes_asleep)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(
+    title = "Relationship Between Steps and Sleep Duration",
+    x = "Total Steps per Day",
+    y = "Total Minutes Asleep"
+  )
+
+```
+
+The data points are widely spread out, with users mainly logging between 3,000–12,000 steps/day and 300–500 minutes of sleep. Looking at the red line, we can see a slight negative slope. To better understand this, we can also calculate the correlation.
+
+```{r}
+activity_sleep %>%
+  filter(!is.na(total_steps), !is.na(total_minutes_asleep)) %>%
+  summarise(correlation = cor(total_steps, total_minutes_asleep))
+
+```
+
+Users who take more steps tend to sleep slightly less, although there is significant variation. This means that other lifestyle factors are more likely to play a stronger role in determining sleep duration, and more analysis is required.
+
+#### 5.1.2 Average Sleep Duration by Activity Level
+
+We will now take a different approach, and group users into bins based on their step counts. This should help highlight the broader pattern by smoothing out any individual fluctuations like we had in the previous plot.
+
+-   Low: \< 5000 steps
+
+-   Moderate: 5000 - 9,999 steps
+
+-   High: 10,000+ steps
+
+Group rows by activity level and calculate the average sleep minutes for each. Then we'll make a simple bar plot.
+
+```{r}
+activity_sleep <- activity_sleep %>%
+  mutate(activity_level = case_when(
+    total_steps < 5000 ~ "Low",
+    total_steps >= 5000 & total_steps < 10000 ~ "Moderate",
+    total_steps >= 10000 ~ "High"
+  ))
+
+avg_sleep_by_level <- activity_sleep %>%
+  filter(!is.na(total_minutes_asleep)) %>%
+  group_by(activity_level) %>%
+  summarise(avg_sleep = mean(total_minutes_asleep, na.rm = TRUE))
+  
+avg_sleep_by_level
+
+```
+
+```{r}
+ggplot(avg_sleep_by_level, aes(x = activity_level, y = avg_sleep, fill = activity_level)) +
+  geom_col(show.legend = FALSE) +
+  labs(
+    title = "Average Sleep Duration by Activity Level",
+    x = "Activity Level",
+    y = "Average Minutes Asleep"
+  )
+
+```
+
+Expected but very interestingly, the low activity group actually averaged the most sleep. This further proves the weak negative correlation that we observed earlier,
+
+#### 5.2 Finding Peak Activity Hours
+
+After analyzing the relationship between activity and sleep, a good next step is to see when users are most active throughout the day. This could help Bellabeat, for example, identify peak engagement times to be scheduling its notifications.
+
+We will make a line plot to show how the hourly step average changes throughout the day.
+
+```{r}
+hourly_steps %>%
+  mutate(hour = hour(datetime)) %>%   # Extracts hour from timestamp             
+  group_by(hour) %>%                                
+  summarise(avg_steps = mean(step_total, na.rm = TRUE)) %>%   # Calcualtes average steps
+  ggplot(aes(x = hour, y = avg_steps)) +
+  geom_line(color = "blue", linewidth = 1) +  
+  geom_point(color = "red", size = 2) +             
+  labs(
+    title = "Average Steps by Hour of Day",
+    x = "Hour of Day (0-23)",
+    y = "Average Steps"
+  ) +
+  # Label for every hour from 0 to 23
+  scale_x_continuous(breaks = 0:23) +
+  theme_minimal()
+```
+
+From the graph, we can see that users tend to start moving early in the morning at around 6-7AM, then remain active till about 7:00 PM. This could imply that many users might be working individuals or students.
+
+Bellabeat could also implement wind-down or relaxation prompts at say hour 20, which is after peak hours.
+
+#### 5.3 Weekly Sleep Patterns
+
+Shifting to a different variable, I'm now interested to see if sleep patterns change across the week. To do so, we'll first have to organize the data by date and then `summarise()` to calculate the average total minutes asleep per day.
+
+```{r}
+daily_sleep_summary <- activity_sleep %>%
+  filter(!is.na(total_minutes_asleep)) %>%
+  group_by(date) %>%
+  summarise(avg_sleep = mean(total_minutes_asleep), .groups = "drop")
+
+```
+
+```{r}
+calendarPlot(
+  daily_sleep_summary,
+  pollutant = "avg_sleep",        # Column to visualize
+  year = 2016,                    # Year of data
+  month = 4:5,                    # April and May
+  cex.lim = c(0.6, 1),            
+  main = "Average Sleep Duration by Day",
+  cols = "increment",             
+  key.header = "Minutes Asleep",  
+  key.position = "top"
+)
+```
+
+-   Sleep duration ranges from **380–480 minutes (6–8 hours)**
+
+-   Some mid-week dips suggesting people may be losing sleep on workdays
+
+-   Weekends doesn't always show longer sleep
+
+The occasional high sleep days could be indicating the recovery of lost sleep throughout the week. All in all, these variations suggest very inconsistent bedtime habits.
+
+Some opportunities for Bellabeat here is to provide users with sleep insight notifications in order to try to potentially motivate improvements.
+
+#### 5.4 Overall Device Usage
+
+Since consistent usage is key for collecting reliable data, an important question is: How often do users actually wear their devices? To find out, we'll group each person into categories based on their logged activities, then use a pie chart to show the proportion of users in each category.
+
+-   **Low Usage -\> 1–10 days**
+
+-   **Moderate Usage -\> 11–20 days**
+
+-   **High Usage –\> 21–31 days**
+
+```{r}
+daily_usage <- activity_sleep %>%
+  group_by(id) %>%
+  # Counts unique days
+  summarise(days_used = n_distinct(date), .groups = "drop") %>%
+  # Categorize Users
+  mutate(usage_category = case_when(
+    days_used >= 21 ~ "High Usage (21–31 days)",
+    days_used >= 11 & days_used <= 20 ~ "Moderate Usage (11–20 days)",
+    TRUE ~ "Low Usage (1–10 days)"
+  ))
+```
+
+To summarize how many users fall into each category, we will go through the following process:
+
+1.  Group by usage
+
+2.  Count how many rows are in each group -\> `user_count`
+
+3.  Calculate the percentage of users in each group to create our labels
+
+```{r}
+usage_summary <- daily_usage %>%
+  group_by(usage_category) %>%
+  summarise(user_count = n()) %>%
+  mutate(percentage = user_count / sum(user_count) * 100,
+         label = paste0(round(percentage), "%"))
+```
+
+Create the pie chart:
+
+```{r}
+ggplot(usage_summary, aes(x = "", y = user_count, fill = usage_category)) +
+  geom_col(width = 1) +
+  coord_polar(theta = "y") +
+  geom_text(aes(label = label), position = position_stack(vjust = 0.5)) +
+  scale_fill_manual(values = c("tomato", "gold", "green")) +
+  labs(
+    title = "Device Usage Distribution (Days Used per User)",
+    fill = "Usage Category"
+  ) +
+  theme_void()
+```
+
+## 6 Conclusion & Recommendations
+
+Bellabeat's mission is to empower women with knowledge about their daily habits and help guide them towards healthy decisions.
+
+While our data was limited - a small sample size and no demographic details - the patterns still offer practical insights into how users are engaging with the products.
+
+That being said, here are some recommendations to help Bellabeat improve its app and marketing approach:
+
+| **Recommendation** | **Description** |
+|------------------------------------|------------------------------------|
+| 1\. Daily step milestone alerts and notifications | From our analysis, users walk as little as 3,000 steps to 12,000 steps/day, with peaks around midday and early evening. Since the daily recommended steps by CDC is 8,000, Bellabeat can send motivational alerts in the morning and celebrate daily milestones to encourage reaching that goal. |
+| 2\. Evening wind‑down reminders | Sleep analysis shows that users sleep less than 8 hours a day with no weekend recovery. Bellabeat could implement a feature allowing users to set a daily bed time and push gentle reminders to help support consistent routines. |
+| 3\. Streak & consistency challenges | In our pie chart visualization, 88% of users uses the device a lot, but 12% falls under low and moderate usage. This could represent a churn risk, and cause users to stop using the product altogether. To reduce the drop-off, Bellabeat could come up with streaks and badges, pushing people to engage more frequently. Challenges could consist of trying to reach higher and higher levels based on amount of steps walked per day. |
+| 4\. Weekly weekend reports | Since no major weekend improvement in sleep or steps was observed, it might be helpful to send out personalized weekend suggestions, either with rest or light activities, to make sure a healthy balance is upheld. |
+
+#### 6.1 Limitations and Future Considerations
+
+To mention briefly again, our analysis is based off a data set from 2016, and limited to 30 users. No gender, age, or lifestyle details were provided to help us dive deeper into the trends. Therefore, results are operational only and not a population-wise conclusion.
+
+Since we were working with Fitbit data, Bellabeat could start by launching pilot programs in order to test out the certain features. For deeper insights, one option is also to conduct targeted user surveys and uncover why people behave the way they do.
+
+For example:
+
+1.  What are consumers' primary interest when using a fitness wearable?
+2.  Do consumers have trouble working the device?
+3.  Are certain features brewing confusion and drawing consumers away from the app?
+
+Collecting qualitative information helps Bellabeat tailor their product improvements, aligning the changes with actual user preferences and motivations.
+
+Special shout out to the Google Data Analytics course and its community for getting me started on this project using R and R Markdown. Excited to dive into even more creative projects next!
